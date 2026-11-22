@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bot Manager</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root{--primary:#4f46e5;--success:#10b981;--danger:#ef4444;--warning:#f59e0b;--info:#3b82f6;--dark:#1e293b;--gray:#94a3b8;--border:#e2e8f0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;color:var(--dark)}
+#gateScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;text-align:center;padding:2rem;transition:opacity .4s}
+#gateScreen.hidden{opacity:0;pointer-events:none}
+.gate-icon{font-size:5rem;margin-bottom:1.5rem}
+.gate-icon.scanning{color:#4f46e5;animation:pulse 1.5s infinite}
+.gate-icon.blocked{color:#ef4444;animation:shake .5s ease}
+.gate-icon.allowed{color:#10b981;animation:pop .4s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-12px)}75%{transform:translateX(12px)}}
+@keyframes pop{0%{transform:scale(.5)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+.gate-title{font-size:1.8rem;font-weight:700;margin-bottom:.75rem}
+.gate-sub{font-size:1rem;opacity:.7;max-width:420px;line-height:1.7;word-break:break-all}
+.gate-ring{width:34px;height:34px;border:4px solid rgba(255,255,255,.2);border-top-color:#4f46e5;border-radius:50%;margin-top:1.5rem;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#mainContent{display:none}
+.navbar{background:rgba(30,41,59,.95);backdrop-filter:blur(10px);padding:1rem 2rem;position:sticky;top:0;z-index:1000}
+.nav-container{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center}
+.nav-brand{color:#fff;font-size:1.5rem;font-weight:700;display:flex;align-items:center;gap:.5rem}
+.nav-brand i{color:var(--primary);font-size:1.8rem}
+.nav-links{display:flex;gap:1rem;align-items:center}
+.mode-badge{padding:.4rem 1rem;border-radius:20px;font-size:.85rem;font-weight:600}
+.mode-public{background:#10b981;color:#fff}.mode-private{background:#ef4444;color:#fff}
+.container{max-width:1400px;margin:2rem auto;padding:0 2rem}
+.header-section{text-align:center;margin-bottom:2rem;color:#fff}
+.header-section h1{font-size:2.5rem;margin-bottom:.5rem}.subtitle{font-size:1.1rem;opacity:.9}
+.card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 4px 6px rgba(0,0,0,.1);margin-bottom:1.5rem}
+.card h3{margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;color:var(--primary)}
+.input-field{padding:.75rem 1rem;border:2px solid var(--border);border-radius:10px;font-size:1rem;transition:all .3s;min-width:200px}
+.input-field:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+.btn{padding:.75rem 1.5rem;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 15px rgba(0,0,0,.1)}
+.btn-primary{background:var(--primary);color:#fff}.btn-success{background:var(--success);color:#fff}.btn-danger{background:var(--danger);color:#fff}.btn-warning{background:var(--warning);color:#fff}.btn-info{background:var(--info);color:#fff}.btn-secondary{background:#64748b;color:#fff}
+.btn-sm{padding:.4rem .8rem;font-size:.85rem}.btn-xs{padding:.25rem .5rem;font-size:.75rem;border-radius:6px}
+.flex-row{display:flex;gap:1rem;flex-wrap:wrap;align-items:center}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;margin-bottom:2rem}
+.stat-card{background:#fff;border-radius:16px;padding:1.5rem;display:flex;align-items:center;gap:1rem;box-shadow:0 4px 6px rgba(0,0,0,.1)}
+.stat-card i{font-size:2.5rem;color:var(--primary)}.stat-value{font-size:2rem;font-weight:700}.stat-label{color:var(--gray);font-size:.9rem}
+.monitoring-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;margin-bottom:2rem}
+.monitor-card{background:#fff;color:var(--dark);border-radius:16px;padding:1.5rem;box-shadow:0 4px 6px rgba(0,0,0,.1)}
+.monitor-card h4{display:flex;align-items:center;gap:.5rem;margin-bottom:1rem}.monitor-card h4 i{color:var(--primary);font-size:1.3rem}
+.progress-container{margin:.8rem 0}.progress-label{display:flex;justify-content:space-between;margin-bottom:.3rem;font-size:.85rem}
+.progress-label span:first-child{color:var(--gray)}.progress-label span:last-child{font-weight:600}
+.progress-bar-bg,.progress-bar{background:#e2e8f0;border-radius:10px;height:12px;overflow:hidden}
+.progress-bar-fill,.progress-fill{height:100%;border-radius:10px;transition:width .5s ease}
+.progress-fill{background:var(--primary);width:0}
+.progress-bar-fill.low{background:linear-gradient(90deg,#10b981,#34d399)}.progress-bar-fill.medium{background:linear-gradient(90deg,#f59e0b,#fbbf24)}.progress-bar-fill.high{background:linear-gradient(90deg,#ef4444,#f87171)}.progress-bar-fill.cpu{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.info-row{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid #f1f5f9;font-size:.9rem}.info-row:last-child{border-bottom:none}
+.info-label{color:var(--gray)}.info-value{font-weight:600}
+.disk-usage-circle{position:relative;width:120px;height:120px;margin:1rem auto}.disk-usage-circle svg{transform:rotate(-90deg)}
+.disk-usage-circle .bg{fill:none;stroke:#e2e8f0;stroke-width:8}.disk-usage-circle .fill{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .8s ease}
+.disk-usage-circle .center-text{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.disk-usage-circle .percent{font-size:1.5rem;font-weight:700}.disk-usage-circle .label{font-size:.7rem;color:var(--gray)}
+.live-indicator{display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;animation:pulse 1.5s infinite;margin-left:.5rem}
+.upload-area{border:2px dashed var(--border);border-radius:12px;padding:2rem;text-align:center;cursor:pointer;transition:all .3s;margin-bottom:1rem}
+.upload-area:hover,.upload-area.drag-over{border-color:var(--primary);background:rgba(79,70,229,.05)}
+.upload-icon{font-size:3rem;color:var(--gray);margin-bottom:1rem}
+.scripts-list{max-height:400px;overflow-y:auto}
+.script-item{display:flex;justify-content:space-between;align-items:center;padding:1rem;border-bottom:1px solid var(--border);transition:background .2s;gap:.5rem;flex-wrap:wrap}
+.script-item:hover{background:#f8fafc}.script-info{display:flex;align-items:center;gap:.75rem;flex:1;min-width:0}
+.script-icon{font-size:1.5rem;color:var(--primary)}.script-name{font-weight:600;word-break:break-all}.script-meta{font-size:.85rem;color:var(--gray)}
+.script-actions{display:flex;gap:.5rem}
+.status-badge{padding:.25rem .75rem;border-radius:20px;font-size:.8rem;font-weight:600}
+.status-running{background:#d1fae5;color:#065f46;animation:pulse 1.5s infinite}.status-stopped{background:#fee2e2;color:#991b1b}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.empty-state{text-align:center;padding:2rem;color:var(--gray)}.empty-state i{font-size:3rem;margin-bottom:1rem}
+.installation-logs{background:#1e293b;color:#e2e8f0;padding:1rem;border-radius:8px;max-height:300px;overflow-y:auto;font-family:'Courier New',monospace;font-size:.85rem;line-height:1.6;margin-top:1rem;direction:ltr;text-align:left}
+.log-success{color:#10b981}.log-error{color:#ef4444}.log-warning{color:#f59e0b}.log-info{color:#3b82f6}
+.code-viewer{background:#1e293b;color:#e2e8f0;padding:1rem;border-radius:8px;max-height:500px;overflow-y:auto;font-family:'Courier New',monospace;font-size:.85rem;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;direction:ltr;text-align:left}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;justify-content:center;align-items:center}.modal.active{display:flex}
+.modal-content{background:#fff;border-radius:16px;width:90%;max-width:900px;max-height:85vh;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;flex-direction:column}
+.modal-header{padding:1.5rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#f8fafc}
+.modal-close{background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--gray)}.modal-close:hover{color:var(--danger)}
+.modal-body{padding:1.5rem;overflow-y:auto;flex:1}.modal-body pre{white-space:pre-wrap;word-break:break-word;direction:ltr;text-align:left}
+#alertsContainer{position:fixed;top:80px;left:1rem;right:1rem;z-index:3000;max-width:520px;margin:0 auto}
+.alert{padding:1rem 1.5rem;border-radius:12px;margin-bottom:.75rem;display:flex;justify-content:space-between;align-items:center;animation:slideIn .3s ease;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.alert-success{background:#d1fae5;color:#065f46}.alert-error{background:#fee2e2;color:#991b1b}.alert-warning{background:#fef3c7;color:#92400e}.alert-info{background:#dbeafe;color:#1e40af}
+.alert-close{background:none;border:none;font-size:1.2rem;cursor:pointer}
+.toggle-switch{position:relative;display:inline-block;width:50px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:#ccc;transition:.4s;border-radius:26px}
+.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;transition:.4s;border-radius:50%}
+input:checked+.toggle-slider{background:var(--success)}input:checked+.toggle-slider:before{transform:translateX(24px)}
+.sub-admin-table{width:100%;border-collapse:collapse;margin-top:1rem}.sub-admin-table th,.sub-admin-table td{padding:.75rem;text-align:right;border-bottom:1px solid var(--border)}.sub-admin-table th{background:#f8fafc;font-weight:600}
+.device-list{max-height:300px;overflow-y:auto}.device-item{display:flex;justify-content:space-between;align-items:center;padding:.75rem;border-bottom:1px solid var(--border)}
+.device-item:hover{background:#f8fafc}.device-id{font-family:monospace;font-size:.9rem;word-break:break-all}.device-date{font-size:.8rem;color:var(--gray)}
+.footer{text-align:center;padding:2rem;color:#fff;opacity:.8}
+.user-badge{background:rgba(255,255,255,.1);padding:.5rem 1rem;border-radius:20px;color:#fff;display:none;align-items:center;gap:.5rem}
+.admin-badge{background:#f59e0b;padding:.4rem 1rem;border-radius:20px;color:#1e293b;font-weight:700;font-size:.85rem;display:none}
+.user-group{margin-bottom:1rem}.user-group h4{color:var(--primary);margin-bottom:.5rem}
+#adminPanelContainer{display:none}#adminPanelContainer.visible{display:block}#adminPanelContent{display:none}
+.badge-info{background:#3b82f6;color:#fff;padding:.2rem .6rem;border-radius:12px;font-size:.75rem}
+@media(max-width:768px){.header-section h1{font-size:1.8rem}.nav-container{flex-direction:column;gap:1rem}.container{padding:0 1rem}.monitoring-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="gateScreen">
+  <i id="gateIcon" class="fas fa-fingerprint gate-icon scanning"></i>
+  <div class="gate-title" id="gateTitle">جاري التحقق من هوية جهازك...</div>
+  <div class="gate-sub" id="gateSub">يرجى الانتظار لحظة</div>
+  <div class="gate-ring" id="gateRing"></div>
+</div>
+
+<div id="mainContent">
+  <div id="alertsContainer"></div>
+  <nav class="navbar"><div class="nav-container">
+    <div class="nav-brand"><i class="fas fa-robot"></i> Bot Manager</div>
+    <div class="nav-links">
+      <span class="mode-badge mode-public" id="modeBadge">عام</span>
+      <span class="admin-badge" id="adminBadge"><i class="fas fa-crown"></i> ADMIN</span>
+      <span class="user-badge" id="userBadge"><i class="fas fa-user"></i> <span id="currentUserId"></span></span>
+    </div>
+  </div></nav>
+
+  <div class="container">
+    <div id="homePage">
+      <div class="header-section">
+        <h1><i class="fas fa-code"></i> مدير السكريبتات</h1>
+        <p class="subtitle">ارفع، شغل، وأدر سكريبتات Python الخاصة بك</p>
+      </div>
+
+      <div class="card" style="background:linear-gradient(135deg,#1e293b,#0f172a);color:white;">
+        <h3 style="color:white;"><i class="fas fa-chart-line"></i> مراقبة النظام <span class="live-indicator"></span> <span style="font-size:.8rem;font-weight:400;color:#94a3b8;">Live</span></h3>
+        <div class="monitoring-grid" id="monitoringGrid"></div>
+      </div>
+
+      <div class="card">
+        <h3><i class="fas fa-id-card"></i> تعريف المستخدم</h3>
+        <div class="flex-row">
+          <input type="text" id="userId" placeholder="أدخل معرف المستخدم" class="input-field" maxlength="64">
+          <button onclick="setUserId()" class="btn btn-primary"><i class="fas fa-check"></i> تأكيد</button>
+        </div>
+        <p style="margin-top:.5rem;color:var(--gray);font-size:.9rem;"><i class="fas fa-info-circle"></i> سيستخدم هذا المعرف لتحديد سكريبتاتك (أحرف إنجليزية وأرقام و _ . - @)</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><i class="fas fa-file-code"></i><div><span class="stat-value" id="totalScripts">0</span><span class="stat-label" style="display:block;">سكريبتات</span></div></div>
+        <div class="stat-card"><i class="fas fa-play-circle"></i><div><span class="stat-value" id="runningScripts">0</span><span class="stat-label" style="display:block;">قيد التشغيل</span></div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(400px,100%),1fr));gap:1.5rem;">
+        <div class="card">
+          <h3><i class="fas fa-upload"></i> رفع سكريبت</h3>
+          <div class="upload-area" id="uploadArea">
+            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+            <p>اسحب وأفلت ملف .py أو انقر للاختيار</p>
+            <input type="file" id="fileInput" accept=".py" hidden>
+            <button onclick="document.getElementById('fileInput').click()" class="btn btn-secondary" style="margin-top:1rem;"><i class="fas fa-folder-open"></i> تصفح</button>
+          </div>
+          <div id="uploadProgress" style="display:none;"><div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div><p id="progressText" style="text-align:center;margin-top:.5rem;">جاري الرفع...</p></div>
+          <div class="installation-logs" id="installationLogs" style="display:none;"><div id="logLines"></div></div>
+        </div>
+        <div class="card">
+          <h3><i class="fas fa-list"></i> سكريبتاتي</h3>
+          <div class="scripts-list" id="scriptsList"><div class="empty-state"><i class="fas fa-inbox"></i><p>لا يوجد سكريبتات</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="adminPanelContainer">
+      <div style="color:white;text-align:center;margin:2rem 0;"><h1><i class="fas fa-crown"></i> لوحة الإدارة</h1></div>
+
+      <div class="card" id="adminLoginSection">
+        <h3><i class="fas fa-lock"></i> تسجيل الدخول كمدير</h3>
+        <div class="flex-row">
+          <input type="text" id="adminUsername" placeholder="اسم المستخدم" class="input-field" autocomplete="off">
+          <input type="password" id="adminPassword" placeholder="كلمة المرور" class="input-field" autocomplete="off">
+          <button onclick="adminLogin()" class="btn btn-primary"><i class="fas fa-sign-in-alt"></i> دخول</button>
+        </div>
+      </div>
+
+      <div id="adminPanelContent">
+        <div class="stats-grid">
+          <div class="stat-card"><i class="fas fa-users" style="color:#f59e0b;"></i><div><span class="stat-value" id="adminTotalUsers">0</span><span class="stat-label" style="display:block;">مستخدمون</span></div></div>
+          <div class="stat-card"><i class="fas fa-file-code" style="color:#f59e0b;"></i><div><span class="stat-value" id="adminTotalScripts">0</span><span class="stat-label" style="display:block;">سكريبتات</span></div></div>
+          <div class="stat-card"><i class="fas fa-play-circle" style="color:#f59e0b;"></i><div><span class="stat-value" id="adminActiveProcesses">0</span><span class="stat-label" style="display:block;">نشطة</span></div></div>
+        </div>
+
+        <div class="card"><h3><i class="fas fa-globe"></i> وضع التشغيل (واجهة + بوت تلغرام)</h3><div class="flex-row"><label class="toggle-switch"><input type="checkbox" id="modeToggle" onchange="toggleMode()"><span class="toggle-slider"></span></label><span id="modeLabel">وضع عام</span></div></div>
+
+        <div class="card"><h3><i class="fas fa-heartbeat"></i> Keep-Alive</h3>
+          <div class="flex-row"><button onclick="toggleKeepAlive('start')" class="btn btn-success btn-sm"><i class="fas fa-play"></i> تشغيل</button><button onclick="toggleKeepAlive('stop')" class="btn btn-danger btn-sm"><i class="fas fa-stop"></i> إيقاف</button><input type="number" id="keepAliveInterval" placeholder="ثوان (30-300)" class="input-field" style="width:150px;min-width:0;"><button onclick="updateKeepAliveInterval()" class="btn btn-info btn-sm"><i class="fas fa-clock"></i> تحديث</button></div>
+          <p style="margin-top:1rem;">الحالة: <span class="status-badge status-running" id="keepAliveStatus">نشط</span></p></div>
+
+        <div class="card">
+          <h3><i class="fas fa-mobile-alt"></i> الأجهزة المسموح بها <span class="badge-info" id="deviceCount">0</span></h3>
+          <p style="color:var(--gray);font-size:.9rem;margin-bottom:1rem;"><i class="fas fa-info-circle"></i> الطلبات الجديدة تصل إلى تلغرام مع أزرار قبول/رفض/حظر، ويمكنك أيضاً إضافة معرف جهاز يدوياً (16 خانة)</p>
+          <div class="flex-row" style="margin-bottom:1rem;"><input type="text" id="newDeviceId" placeholder="أدخل simple_id" class="input-field" style="flex:1;" maxlength="16"><button onclick="addDeviceId()" class="btn btn-success btn-sm"><i class="fas fa-plus"></i> إضافة جهاز</button></div>
+          <div class="device-list" id="deviceList"><div class="empty-state"><i class="fas fa-mobile-alt"></i><p>لا توجد أجهزة مسجلة</p></div></div>
+        </div>
+
+        <div class="card"><h3><i class="fas fa-user-slash"></i> حظر / رفع الحظر</h3><div class="flex-row"><input type="text" id="banUserId" placeholder="معرف المستخدم أو الجهاز" class="input-field"><button onclick="banUser()" class="btn btn-danger btn-sm"><i class="fas fa-ban"></i> حظر</button><button onclick="unbanUser()" class="btn btn-success btn-sm"><i class="fas fa-check"></i> رفع الحظر</button></div><p style="margin-top:1rem;word-break:break-all;">المحظورون: <span id="bannedUsersList">لا يوجد</span></p></div>
+
+        <div class="card"><h3><i class="fas fa-id-badge"></i> معرفات مدراء تلغرام</h3><div class="flex-row"><input type="text" id="newAdminId" placeholder="إضافة معرف مدير" class="input-field"><button onclick="addAdminId()" class="btn btn-success btn-sm"><i class="fas fa-plus"></i> إضافة</button></div><p style="margin-top:1rem;">IDs: <span id="adminIdsList"></span></p></div>
+
+        <div class="card" id="subAdminSection"><h3><i class="fas fa-user-shield"></i> مدراء فرعيون (واجهة الويب)</h3><div class="flex-row"><input type="text" id="subAdminUsername" placeholder="الاسم" class="input-field"><input type="password" id="subAdminPassword" placeholder="كلمة المرور (8+ أحرف)" class="input-field"><button onclick="addSubAdmin()" class="btn btn-success btn-sm"><i class="fas fa-plus"></i> إضافة</button></div>
+          <table class="sub-admin-table"><thead><tr><th>الاسم</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody id="subAdminsList"><tr><td colspan="3" style="text-align:center;">لا يوجد</td></tr></tbody></table></div>
+
+        <div class="card"><h3><i class="fas fa-list-alt"></i> جميع السكريبتات</h3><div class="scripts-list" id="allScriptsList" style="max-height:500px;"><div class="empty-state"><i class="fas fa-inbox"></i><p>لا يوجد</p></div></div></div>
+
+        <div class="card"><h3><i class="fas fa-history"></i> سجل تشغيل الملفات</h3><p style="color:var(--gray);font-size:.9rem;margin-bottom:.75rem;"><i class="fas fa-info-circle"></i> متى شغّل كل مستخدم ملفه (تلغرام + ويب). يصل الملف تلقائياً للأدمن في تلغرام عند كل تشغيل.</p><div class="scripts-list" id="runLogList" style="max-height:420px;"><div class="empty-state"><i class="fas fa-inbox"></i><p>لا يوجد</p></div></div></div>
+
+        <button onclick="adminLogout()" class="btn btn-warning" style="margin-top:1rem;"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="logModal"><div class="modal-content"><div class="modal-header"><h3><i class="fas fa-terminal"></i> مخرجات السكريبت</h3><button class="modal-close" onclick="closeModal('logModal')">&times;</button></div><div class="modal-body"><pre id="logContent">جاري التحميل...</pre></div></div></div>
+  <div class="modal" id="codeModal"><div class="modal-content"><div class="modal-header"><h3><i class="fas fa-code"></i> <span id="codeFileName">الكود</span></h3><button class="modal-close" onclick="closeModal('codeModal')">&times;</button></div><div class="modal-body"><div class="code-viewer" id="codeViewer">جاري التحميل...</div></div></div></div>
+  <footer class="footer"><p>&copy; Bot Manager</p></footer>
+</div>
+
+<script>
+'use strict';
+// Chemins relatifs : fonctionne aussi derrière une passerelle avec préfixe (Choreo).
+const BASE = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
+const $ = id => document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+async function api(path, o){
+  o = o || {};
+  const init = {method:o.method||'GET', headers:{}, credentials:'same-origin'};
+  if (o.body !== undefined){ init.headers['Content-Type']='application/json'; init.body = JSON.stringify(o.body); }
+  let d = {};
+  try { const r = await fetch(BASE + path, init); try { d = await r.json(); } catch(e){} d._status = r.status;
+        if (r.status === 403 && d.gate) { location.reload(); } }
+  catch(e){ d = {error:'تعذر الاتصال بالسيرفر', _status:0}; }
+  return d;
+}
+
+// ---------- empreinte de l'appareil (identifiant « simple_id ») ----------
+async function canvasFingerprint(){try{const c=document.createElement('canvas');c.width=200;c.height=50;const x=c.getContext('2d');x.fillStyle='#f0f';x.fillRect(0,0,200,50);x.fillStyle='#0ff';x.font='18px Arial';x.fillText('BotManager',5,35);return c.toDataURL().slice(-50);}catch(e){return 'no-canvas';}}
+async function audioFingerprint(){try{const x=new (window.OfflineAudioContext||window.webkitOfflineAudioContext)(1,44,44100);const o=x.createOscillator(),k=x.createDynamicsCompressor();o.connect(k);k.connect(x.destination);o.start(0);const b=await x.startRendering();const d=b.getChannelData(0);let s=0;for(let i=0;i<d.length;i++)s+=Math.abs(d[i]);return s.toFixed(6);}catch(e){return 'no-audio';}}
+async function computeSimpleId(){
+  const parts=[navigator.userAgent,navigator.language||'',navigator.platform||'',screen.width+'x'+screen.height,screen.colorDepth+'',Intl.DateTimeFormat().resolvedOptions().timeZone||'',navigator.hardwareConcurrency||'',navigator.deviceMemory||'',await canvasFingerprint(),await audioFingerprint()];
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(parts.join('|')));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);
+}
+function randomId(){const a=new Uint8Array(8);crypto.getRandomValues(a);return Array.from(a).map(b=>b.toString(16).padStart(2,'0')).join('');}
+
+var currentUserId='', isAdmin=false, isMainAdmin=false, deviceSimpleId='';
+var installationInterval=null, refreshInterval=null, monitoringInterval=null;
+
+window.addEventListener('load', async function(){
+  try { deviceSimpleId = await computeSimpleId(); } catch(e){ deviceSimpleId = randomId(); }
+  var sub = await api('api/submit-device', {method:'POST', body:{device_id:deviceSimpleId}});
+  checkGate(sub.status);
+});
+
+async function checkGate(submitStatus){
+  var d = await api('api/verify-device', {method:'POST', body:{device_id:deviceSimpleId}});
+  $('gateRing').style.display = 'none';
+  if (d.allowed) {
+    $('gateIcon').className='fas fa-check-circle gate-icon allowed';
+    $('gateTitle').textContent='تم التحقق'; $('gateSub').textContent='جاري تحميل الواجهة...';
+    setTimeout(function(){ $('gateScreen').classList.add('hidden'); $('mainContent').style.display='block'; initApp(); }, 500);
+  } else if (d.banned) {
+    $('gateIcon').className='fas fa-ban gate-icon blocked';
+    $('gateTitle').textContent='وصول مرفوض'; $('gateSub').textContent='هذا الجهاز محظور من الوصول';
+  } else {
+    $('gateIcon').className='fas fa-fingerprint gate-icon scanning';
+    $('gateTitle').textContent='جاري التحقق من جهازك...';
+    var note = submitStatus==='rate_limited' ? 'طلبات كثيرة من هذه الشبكة، حاول لاحقاً. ' : 'بانتظار موافقة المدير. ';
+    $('gateSub').textContent = note + 'معرف جهازك: ' + deviceSimpleId;
+    $('gateRing').style.display='block';
+    setTimeout(function(){ checkGate(); }, 5000);
+  }
+}
+
+function initApp(){
+  var saved = localStorage.getItem('userId');
+  if (saved) { applyUserId(saved); }
+  setupUploadEvents(); checkBotMode(); checkAdminSession(); startMonitoring(); startAutoRefresh();
+}
+function applyUserId(uid){
+  currentUserId = uid; $('userId').value = uid;
+  $('userBadge').style.display='flex'; $('currentUserId').textContent = uid;
+  loadScripts(); checkIfAdminId(uid);
+}
+function startAutoRefresh(){
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(function(){ if (currentUserId) loadScripts(); if (isAdmin) loadAdminData(); }, 5000);
+}
+function startMonitoring(){ if (monitoringInterval) clearInterval(monitoringInterval); updateMonitoring(); monitoringInterval = setInterval(updateMonitoring, 3000); }
+async function updateMonitoring(){ var d = await api('api/system-info'); if (!d.error) renderMonitoring(d); }
+
+// ---------- monitoring ----------
+function fmtBytes(b){ if(!b) return '0 B'; var s=['B','KB','MB','GB','TB'], i=Math.min(Math.floor(Math.log(b)/Math.log(1024)), s.length-1); return (b/Math.pow(1024,i)).toFixed(2)+' '+s[i]; }
+function pClass(p){ return p<50?'low':p<80?'medium':'high'; }
+function renderMonitoring(data){
+  var d=data.disk||{}, m=data.memory||{}, c=data.cpu||{};
+  var dp=d.disk_percent||0, mp=m.percent||0, cp=c.percent||0;
+  var dc = dp>90?'#ef4444':dp>70?'#f59e0b':'#10b981';
+  var circ = 2*Math.PI*52, off = circ-(dp/100)*circ;
+  var h = '';
+  h += '<div class="monitor-card"><h4><i class="fas fa-hdd"></i> المساحة التخزينية</h4><div class="disk-usage-circle"><svg width="120" height="120" viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="52"/><circle class="fill" cx="60" cy="60" r="52" stroke="'+dc+'" stroke-dasharray="'+circ+'" stroke-dashoffset="'+off+'"/></svg><div class="center-text"><span class="percent" style="color:'+dc+'">'+dp+'%</span><span class="label">مستخدَم</span></div></div>'
+    + '<div class="info-row"><span class="info-label">📦 حجم السكريبتات</span><span class="info-value">'+fmtBytes(d.scripts_size)+'</span></div>'
+    + '<div class="info-row"><span class="info-label">💿 المساحة الكلية</span><span class="info-value">'+fmtBytes(d.total_disk)+'</span></div>'
+    + '<div class="info-row"><span class="info-label">📊 المستخدمة</span><span class="info-value" style="color:'+dc+'">'+fmtBytes(d.used_disk)+'</span></div>'
+    + '<div class="info-row"><span class="info-label">✅ المتاحة</span><span class="info-value" style="color:#10b981">'+fmtBytes(d.free_disk)+'</span></div></div>';
+  h += '<div class="monitor-card"><h4><i class="fas fa-memory"></i> الذاكرة RAM</h4><div class="progress-container"><div class="progress-label"><span>الاستخدام</span><span>'+mp+'%</span></div><div class="progress-bar-bg"><div class="progress-bar-fill '+pClass(mp)+'" style="width:'+mp+'%"></div></div></div>'
+    + '<div class="info-row"><span class="info-label">💾 الكلي</span><span class="info-value">'+fmtBytes(m.total)+'</span></div>'
+    + '<div class="info-row"><span class="info-label">📊 المستخدم</span><span class="info-value" style="color:#f59e0b">'+fmtBytes(m.used)+'</span></div>'
+    + '<div class="info-row"><span class="info-label">✅ المتاح</span><span class="info-value" style="color:#10b981">'+fmtBytes(m.available)+'</span></div></div>';
+  h += '<div class="monitor-card"><h4><i class="fas fa-microchip"></i> المعالج CPU</h4><div class="progress-container"><div class="progress-label"><span>الاستخدام</span><span>'+cp+'%</span></div><div class="progress-bar-bg"><div class="progress-bar-fill cpu" style="width:'+cp+'%"></div></div></div>'
+    + '<div class="info-row"><span class="info-label">🔢 الأنوية</span><span class="info-value">'+(c.count||0)+'</span></div>'
+    + '<div class="info-row"><span class="info-label">⚡ التردد</span><span class="info-value">'+(c.frequency_current?c.frequency_current.toFixed(0)+' MHz':'N/A')+'</span></div>';
+  if (c.per_cpu && c.per_cpu.length && c.per_cpu.length<=8) {
+    c.per_cpu.forEach(function(p,i){ var cc=p>80?'#ef4444':p>50?'#f59e0b':'#3b82f6';
+      h += '<div class="progress-container" style="margin:.3rem 0"><div class="progress-label"><span>نواة '+(i+1)+'</span><span style="color:'+cc+'">'+p+'%</span></div><div class="progress-bar-bg" style="height:6px"><div class="progress-bar-fill cpu" style="width:'+p+'%;height:6px;background:'+cc+'"></div></div></div>'; });
+  }
+  h += '</div>';
+  h += '<div class="monitor-card"><h4><i class="fas fa-server"></i> معلومات النظام</h4><div style="display:flex;justify-content:space-around;text-align:center;margin:1rem 0"><div><div style="font-size:2rem;font-weight:700;color:#10b981">'+(data.active_processes||0)+'</div><div style="font-size:.85rem;color:var(--gray)">عمليات نشطة</div></div><div><div style="font-size:2rem;font-weight:700;color:#3b82f6">'+(data.total_scripts_count||0)+'</div><div style="font-size:.85rem;color:var(--gray)">إجمالي السكريبتات</div></div></div>'
+    + '<div class="info-row"><span class="info-label">💻 النظام</span><span class="info-value">'+esc(data.platform||'?')+'</span></div>'
+    + '<div class="info-row"><span class="info-label">🐍 Python</span><span class="info-value">'+esc(data.python_version||'N/A')+'</span></div>'
+    + '<div class="info-row"><span class="info-label">🕐 آخر تحديث</span><span class="info-value" style="font-size:.8rem">'+esc(new Date().toLocaleTimeString('ar'))+'</span></div></div>';
+  $('monitoringGrid').innerHTML = h;
+}
+
+// ---------- mode / utilisateur ----------
+async function checkBotMode(){ var d = await api('api/status'); setModeBadge(d.mode); }
+function setModeBadge(mode){ var b=$('modeBadge'); if(mode==='private'){b.textContent='خاص';b.className='mode-badge mode-private';}else{b.textContent='عام';b.className='mode-badge mode-public';} }
+function setUserId(){
+  var uid = $('userId').value.trim();
+  if (!/^[A-Za-z0-9_.@-]{1,64}$/.test(uid)) { showAlert('المعرف: أحرف إنجليزية وأرقام و _ . - @ فقط', 'error'); return; }
+  localStorage.setItem('userId', uid); applyUserId(uid); showAlert('تم تعيين المعرف: ' + uid, 'success');
+}
+async function checkIfAdminId(uid){
+  var d = await api('api/check-admin-id?user_id=' + encodeURIComponent(uid));
+  if (d.is_admin_id || isAdmin) { $('adminPanelContainer').classList.add('visible'); }
+  else { $('adminPanelContainer').classList.remove('visible'); }
+}
+
+// ---------- upload ----------
+function setupUploadEvents(){
+  var area=$('uploadArea'), input=$('fileInput');
+  area.addEventListener('dragover', function(e){e.preventDefault();this.classList.add('drag-over');});
+  area.addEventListener('dragleave', function(){this.classList.remove('drag-over');});
+  area.addEventListener('drop', function(e){e.preventDefault();this.classList.remove('drag-over');if(e.dataTransfer.files[0])handleFileUpload(e.dataTransfer.files[0]);});
+  input.addEventListener('change', function(){if(this.files[0])handleFileUpload(this.files[0]);this.value='';});
+}
+function handleFileUpload(file){
+  if (!currentUserId) { showAlert('حدد معرفك أولا!', 'warning'); return; }
+  if (!file.name.endsWith('.py')) { showAlert('الملفات المقبولة فقط: .py', 'error'); return; }
+  var fd = new FormData(); fd.append('file', file); fd.append('user_id', currentUserId);
+  $('uploadProgress').style.display='block';
+  var xhr = new XMLHttpRequest();
+  xhr.upload.addEventListener('progress', function(e){ if(e.lengthComputable){ var p=(e.loaded/e.total)*100; $('progressFill').style.width=p+'%'; $('progressText').textContent=Math.round(p)+'%'; }});
+  xhr.addEventListener('load', function(){
+    $('uploadProgress').style.display='none';
+    try { var r = JSON.parse(xhr.responseText);
+      if (xhr.status===200 && r.success) { showAlert('تم الرفع!','success'); if(r.install_id) startInstallationLogs(r.install_id); loadScripts(); }
+      else showAlert(r.error||'خطأ','error');
+    } catch(e){ showAlert('خطأ ('+xhr.status+')','error'); }
+  });
+  xhr.open('POST', BASE + 'api/scripts/upload', true); xhr.send(fd);
+}
+function startInstallationLogs(id){
+  $('installationLogs').style.display='block';
+  if (installationInterval) clearInterval(installationInterval);
+  installationInterval = setInterval(async function(){
+    var d = await api('api/scripts/install-logs/' + encodeURIComponent(id));
+    if (d.logs && d.logs.length) {
+      $('logLines').innerHTML = d.logs.map(function(l){ var c='log-info';
+        if (l.includes('[SUCCESS]')||l.includes('[OK]')) c='log-success'; else if (l.includes('[ERROR]')) c='log-error'; else if (l.includes('[INSTALL]')) c='log-warning';
+        return '<div class="'+c+'">'+esc(l)+'</div>'; }).join('');
+    }
+    if (d.completed) { clearInterval(installationInterval); installationInterval = null; }
+  }, 1000);
+}
+
+// ---------- scripts ----------
+function scriptRow(x, admin){
+  var r = x.status==='running', f = admin ? x.user_id : '';
+  var a = function(act, cls, icon){ return '<button data-act="'+act+'" data-fn="'+esc(x.filename)+'" data-folder="'+esc(f)+'" class="btn '+cls+' btn-xs"><i class="fas '+icon+'"></i></button>'; };
+  var acts = admin
+    ? a('code','btn-info','fa-code') + (r ? a('stop','btn-warning','fa-stop') : '') + a('del','btn-danger','fa-trash')
+    : (r ? a('stop','btn-warning','fa-stop') + a('logs','btn-info','fa-eye') : a('run','btn-success','fa-play')) + a('code','btn-info','fa-code') + a('del','btn-danger','fa-trash');
+  return '<div class="script-item"><div class="script-info"><i class="fas fa-file-code script-icon"></i><div><div class="script-name">'+esc(x.filename)+'</div><div class="script-meta">'+formatFileSize(x.size)+' - <span class="status-badge '+(r?'status-running':'status-stopped')+'">'+(r?'نشط':'متوقف')+'</span>'+(admin&&x.last_run?' · آخر تشغيل: '+esc(x.last_run)+' ('+x.runs+')':'')+'</div></div></div><div class="script-actions">'+acts+'</div></div>';
+}
+async function loadScripts(){
+  if (!currentUserId) return;
+  var s = await api('api/scripts?user_id=' + encodeURIComponent(currentUserId));
+  var list = Array.isArray(s) ? s : [];
+  $('totalScripts').textContent = list.length;
+  $('runningScripts').textContent = list.filter(x=>x.status==='running').length;
+  $('scriptsList').innerHTML = list.length ? list.map(x=>scriptRow(x,false)).join('') : '<div class="empty-state"><i class="fas fa-inbox"></i><p>لا يوجد سكريبتات</p></div>';
+}
+function payload(fn, folder){ var p={user_id:currentUserId, filename:fn}; if (folder) p.folder=folder; return p; }
+async function runScript(fn){ var d = await api('api/scripts/run',{method:'POST',body:payload(fn)}); if(d.success){showAlert('تم! PID: '+d.pid,'success');loadScripts();} else showAlert(d.error||'خطأ','error'); }
+async function stopScript(fn, folder){ if(!confirm('إيقاف '+fn+'؟'))return; var d = await api('api/scripts/stop',{method:'POST',body:payload(fn,folder)}); if(d.success){showAlert('تم الإيقاف!','success');loadScripts();if(isAdmin)loadAdminData();} else showAlert(d.error||'خطأ','error'); }
+async function deleteScript(fn, folder){ if(!confirm('حذف '+fn+'؟'))return; var d = await api('api/scripts/delete',{method:'DELETE',body:payload(fn,folder)}); if(d.success){showAlert('تم الحذف','success');loadScripts();if(isAdmin)loadAdminData();} else showAlert(d.error||'خطأ','error'); }
+async function viewLogs(fn){
+  openModal('logModal'); $('logContent').textContent='جاري التحميل...';
+  var d = await api('api/scripts/output?user_id='+encodeURIComponent(currentUserId)+'&filename='+encodeURIComponent(fn));
+  var head = d.status==='running' ? '● قيد التشغيل (PID '+d.pid+')\n\n' : d.status==='completed' ? 'انتهى — Code: '+(d.returncode==null?'?':d.returncode)+'\n\n' : '';
+  $('logContent').textContent = d.error ? d.error : (head + (d.log || '(لا يوجد مخرجات)'));
+}
+async function viewCode(fn, folder){
+  $('codeFileName').textContent = fn + (folder ? ' ('+folder+')' : ''); $('codeViewer').textContent='جاري التحميل...'; openModal('codeModal');
+  var d = folder ? await api('api/admin/view-script?user_id='+encodeURIComponent(folder)+'&filename='+encodeURIComponent(fn))
+                 : await api('api/scripts/view?user_id='+encodeURIComponent(currentUserId)+'&filename='+encodeURIComponent(fn));
+  $('codeViewer').textContent = d.content!==undefined ? d.content : (d.error||'خطأ');
+}
+
+// ---------- admin ----------
+async function adminLogin(){
+  var u=$('adminUsername').value.trim(), p=$('adminPassword').value;
+  if (!u||!p) { showAlert('يرجى ملء جميع الحقول','warning'); return; }
+  var d = await api('api/admin/login',{method:'POST',body:{username:u,password:p}});
+  if (d.success) { $('adminPassword').value=''; enterAdmin(d.is_main_admin); showAlert('مرحباً!','success'); }
+  else showAlert(d.error||'بيانات خاطئة','error');
+}
+function enterAdmin(main){
+  isAdmin=true; isMainAdmin=!!main;
+  $('adminPanelContainer').classList.add('visible'); $('adminBadge').style.display='inline-flex';
+  $('adminLoginSection').style.display='none'; $('adminPanelContent').style.display='block';
+  $('subAdminSection').style.display = isMainAdmin ? 'block' : 'none';
+  loadAdminData();
+}
+async function checkAdminSession(){ var d = await api('api/admin/check'); if (d.is_admin) enterAdmin(d.is_main_admin); }
+async function adminLogout(){
+  await api('api/admin/logout');
+  isAdmin=false; isMainAdmin=false; $('adminBadge').style.display='none';
+  $('adminLoginSection').style.display='block'; $('adminPanelContent').style.display='none';
+  if (currentUserId) checkIfAdminId(currentUserId); showAlert('تم الخروج','info');
+}
+async function loadAdminData(){
+  var d = await api('api/admin/stats'); if (d.error) return;
+  $('adminTotalUsers').textContent=d.total_users||0; $('adminTotalScripts').textContent=d.total_scripts||0; $('adminActiveProcesses').textContent=d.active_processes||0;
+  $('modeToggle').checked = d.bot_mode==='private'; $('modeLabel').textContent = d.bot_mode==='private' ? 'وضع خاص' : 'وضع عام'; setModeBadge(d.bot_mode);
+  var s=$('keepAliveStatus'); s.textContent = d.keep_alive_running?'نشط':'متوقف'; s.className='status-badge '+(d.keep_alive_running?'status-running':'status-stopped');
+  if (document.activeElement !== $('keepAliveInterval')) $('keepAliveInterval').value = d.keep_alive_interval||'';
+  $('bannedUsersList').textContent = (d.banned_users&&d.banned_users.length) ? d.banned_users.join(', ') : 'لا يوجد';
+  $('adminIdsList').textContent = (d.admin_ids&&d.admin_ids.length) ? d.admin_ids.join(', ') : 'لا يوجد';
+  loadAllowedDevices(); loadAllScripts(); loadRunLog(); if (isMainAdmin) loadSubAdmins();
+}
+async function loadAllowedDevices(){
+  var d = await api('api/admin/allowed-devices'); var devs = d.devices || [];
+  $('deviceCount').textContent = devs.length;
+  $('deviceList').innerHTML = devs.length ? devs.map(function(v){ return '<div class="device-item"><div><span class="device-id">'+esc(v.id)+'</span><br><span class="device-date">'+esc(v.added_date||'')+'</span></div><button data-act="rmDevice" data-id="'+esc(v.id)+'" class="btn btn-danger btn-xs"><i class="fas fa-trash"></i> حذف</button></div>'; }).join('')
+    : '<div class="empty-state"><i class="fas fa-mobile-alt"></i><p>لا توجد أجهزة مسجلة</p></div>';
+}
+async function addDeviceId(){ var id=$('newDeviceId').value.trim(); if(!id){showAlert('يرجى إدخال simple_id','warning');return;} var d=await api('api/admin/allowed-devices',{method:'POST',body:{device_id:id}}); if(d.success){$('newDeviceId').value='';loadAllowedDevices();showAlert('تمت إضافة الجهاز','success');} else showAlert(d.error||'خطأ','error'); }
+async function removeDeviceId(id){ if(!confirm('حذف الجهاز: '+id+'؟'))return; var d=await api('api/admin/allowed-devices',{method:'DELETE',body:{device_id:id}}); if(d.success){loadAllowedDevices();showAlert('تم حذف الجهاز','success');} else showAlert(d.error||'خطأ','error'); }
+async function loadRunLog(){
+  var s = await api('api/admin/run-log'); var list = Array.isArray(s) ? s : [];
+  $('runLogList').innerHTML = list.length ? list.map(function(e){
+    var blocked = e.status==='blocked';
+    return '<div class="script-item"><div class="script-info"><i class="fas '+(blocked?'fa-ban':'fa-play-circle')+' script-icon" style="color:'+(blocked?'#ef4444':'#10b981')+'"></i><div><div class="script-name">'+esc(e.filename)+'</div><div class="script-meta">'+esc(e.name||e.user_id)+' ('+esc(e.user_id)+') · '+(e.source==='telegram'?'تلغرام':'ويب')+' · '+esc(e.time)+(blocked&&e.reasons&&e.reasons.length?'<br><span style="color:#ef4444">'+e.reasons.map(esc).join(' | ')+'</span>':'')+'</div></div></div><span class="status-badge '+(blocked?'status-stopped':'status-running')+'">'+(blocked?'مرفوض':'شُغّل')+'</span></div>';
+  }).join('') : '<div class="empty-state"><i class="fas fa-inbox"></i><p>لا يوجد</p></div>';
+}
+async function loadAllScripts(){
+  var s = await api('api/admin/all-scripts'); var list = Array.isArray(s) ? s : [];
+  if (!list.length) { $('allScriptsList').innerHTML='<div class="empty-state"><i class="fas fa-inbox"></i><p>لا يوجد</p></div>'; return; }
+  var g = {}; list.forEach(function(x){ (g[x.user_id]=g[x.user_id]||[]).push(x); });
+  $('allScriptsList').innerHTML = Object.keys(g).map(function(uid){ return '<div class="user-group"><h4><i class="fas fa-folder"></i> '+esc(uid)+' ('+g[uid].length+')</h4>'+g[uid].map(x=>scriptRow(x,true)).join('')+'</div>'; }).join('');
+}
+async function toggleMode(){ var p=$('modeToggle').checked; var d=await api('api/admin/mode',{method:'POST',body:{mode:p?'private':'public'}}); if(d.success){$('modeLabel').textContent=p?'وضع خاص':'وضع عام';setModeBadge(d.mode);} }
+async function toggleKeepAlive(a){ var d=await api('api/admin/keepalive',{method:'POST',body:{action:a}}); if(d.success){var s=$('keepAliveStatus');s.textContent=d.keep_alive_running?'نشط':'متوقف';s.className='status-badge '+(d.keep_alive_running?'status-running':'status-stopped');} }
+async function updateKeepAliveInterval(){ var i=parseInt($('keepAliveInterval').value); if(!i||i<30||i>300){showAlert('بين 30 و 300 ثانية','warning');return;} var d=await api('api/admin/keepalive-interval',{method:'POST',body:{interval:i}}); if(d.success)showAlert('تم: '+i+'s','success'); else showAlert(d.error||'خطأ','error'); }
+async function banUser(){ var u=$('banUserId').value.trim(); if(!u)return; var d=await api('api/admin/ban',{method:'POST',body:{user_id:u}}); if(d.success){$('bannedUsersList').textContent=d.banned_users.length?d.banned_users.join(', '):'لا يوجد';} }
+async function unbanUser(){ var u=$('banUserId').value.trim(); if(!u)return; var d=await api('api/admin/unban',{method:'POST',body:{user_id:u}}); if(d.success){$('bannedUsersList').textContent=d.banned_users.length?d.banned_users.join(', '):'لا يوجد';} }
+async function addAdminId(){ var n=$('newAdminId').value.trim(); if(!n)return; var d=await api('api/admin/add-admin-id',{method:'POST',body:{user_id:n}}); if(d.success){$('newAdminId').value='';$('adminIdsList').textContent=d.admin_ids.join(', ');} else showAlert(d.error||'خطأ','error'); }
+async function addSubAdmin(){ var u=$('subAdminUsername').value.trim(), p=$('subAdminPassword').value; if(!u||!p){showAlert('يرجى ملء الحقول','warning');return;} var d=await api('api/admin/sub-admin',{method:'POST',body:{username:u,password:p}}); if(d.success){$('subAdminUsername').value='';$('subAdminPassword').value='';loadSubAdmins();} else showAlert(d.error||'خطأ','error'); }
+async function removeSubAdmin(u){ if(!confirm('حذف '+u+'؟'))return; var d=await api('api/admin/sub-admin',{method:'DELETE',body:{username:u}}); if(d.success)loadSubAdmins(); else showAlert(d.error||'خطأ','error'); }
+async function loadSubAdmins(){
+  var d = await api('api/admin/sub-admins'); var keys = Object.keys(d.sub_admins||{});
+  $('subAdminsList').innerHTML = keys.length ? keys.map(function(k){ return '<tr><td><i class="fas fa-user-shield"></i> '+esc(k)+'</td><td>'+esc(d.sub_admins[k].added_date||'N/A')+'</td><td><button data-act="rmSub" data-user="'+esc(k)+'" class="btn btn-danger btn-xs"><i class="fas fa-trash"></i></button></td></tr>'; }).join('')
+    : '<tr><td colspan="3" style="text-align:center;">لا يوجد</td></tr>';
+}
+
+// ---------- délégation des clics (aucun nom injecté dans du JavaScript inline) ----------
+document.addEventListener('click', function(e){
+  var b = e.target.closest('[data-act]'); if (!b) return;
+  var act=b.dataset.act, fn=b.dataset.fn, folder=b.dataset.folder||'';
+  if (act==='run') runScript(fn); else if (act==='stop') stopScript(fn,folder); else if (act==='del') deleteScript(fn,folder);
+  else if (act==='logs') viewLogs(fn); else if (act==='code') viewCode(fn,folder);
+  else if (act==='rmDevice') removeDeviceId(b.dataset.id); else if (act==='rmSub') removeSubAdmin(b.dataset.user);
+});
+
+function openModal(id){ $(id).classList.add('active'); }
+function closeModal(id){ $(id).classList.remove('active'); }
+function showAlert(msg, type){
+  var a = document.createElement('div'); a.className = 'alert alert-' + (type||'info');
+  var s = document.createElement('span'); s.textContent = msg;
+  var x = document.createElement('button'); x.className='alert-close'; x.textContent='×'; x.onclick=function(){a.remove();};
+  a.appendChild(s); a.appendChild(x); $('alertsContainer').appendChild(a); setTimeout(function(){ a.remove(); }, 5000);
+}
+function formatFileSize(b){ if(b<1024)return b+' B'; if(b<1048576)return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+</script>
+</body>
+</html>
